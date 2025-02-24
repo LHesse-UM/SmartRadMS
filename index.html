@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>OpenLayers Münster Map</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@latest/ol.css">
+  <link rel="icon" type="image/png" href="logoSmartRad.png">
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      width: 100%;
+    }
+    .map {
+      height: 100%;
+      width: 100%;
+    }
+    /* Einfaches Styling für die Toolbar */
+    #toolbar {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: white;
+      padding: 5px;
+      border: 1px solid #ccc;
+      z-index: 1000;
+    }
+  </style>
+</head>
+<body>
+<div id="toolbar">
+  <select id="draw-type">
+    <option value="None">Kein Zeichnen</option>
+    <option value="Point">Punkt</option>
+    <option value="LineString">Linie</option>
+    <option value="Polygon">Polygon</option>
+  </select>
+  <button id="draw-toggle">Zeichnen umschalten</button>
+</div>
+<div id="map" class="map"></div>
+<script src="https://cdn.jsdelivr.net/npm/ol@latest/dist/ol.js"></script>
+<script>
+  // Koordinaten für Münster (Längengrad, Breitengrad)
+  var munsterCoords = ol.proj.fromLonLat([7.630, 51.960]);
+
+  // Erstelle die Map mit OSM als Basislayer
+  var map = new ol.Map({
+    target: 'map',
+    layers: [
+      new ol.layer.Tile({
+        source: new ol.source.OSM()
+      })
+    ],
+    view: new ol.View({
+      center: munsterCoords,
+      zoom: 13
+    })
+  });
+
+  // Erstelle eine Vektorquelle und -layer für das Straßennetz
+  var roadSource = new ol.source.Vector();
+  var roadLayer = new ol.layer.Vector({
+    source: roadSource,
+    style: new ol.style.Style({
+      stroke: new ol.style.Stroke({
+        color: '#ff0000',
+        width: 2
+      })
+    })
+  });
+  map.addLayer(roadLayer);
+
+  // Funktion, um das Straßennetz via Overpass API zu laden
+  function loadRoads() {
+    var query = '[out:xml];area[name="Münster"]->.searchArea;(way["highway"](area.searchArea););out body;>;out skel qt;';
+    var url = 'https://overpass-api.de/api/interpreter?data=' + encodeURIComponent(query);
+    fetch(url)
+      .then(function(response) { return response.text(); })
+      .then(function(data) {
+        var parser = new DOMParser();
+        var xmlDoc = parser.parseFromString(data, 'application/xml');
+        var format = new ol.format.OSMXML();
+        var features = format.readFeatures(xmlDoc, {
+          featureProjection: 'EPSG:3857'
+        });
+        roadSource.addFeatures(features);
+      })
+      .catch(function(error) {
+        console.error('Fehler beim Laden der Straßendaten:', error);
+      });
+  }
+  loadRoads();
+
+  // Hinzufügen der Modify-Interaktion, um Geometrien bearbeiten zu können
+  var modify = new ol.interaction.Modify({
+    source: roadSource
+  });
+  map.addInteraction(modify);
+
+  // Hinzufügen einer Draw-Interaktion, um neue Geometrien hinzufügen zu können
+  var draw; // Globale Variable für die Draw-Interaktion
+  var drawTypeSelect = document.getElementById('draw-type');
+  var drawToggleButton = document.getElementById('draw-toggle');
+
+  function addDrawInteraction(drawType) {
+    if (draw) {
+      map.removeInteraction(draw);
+      draw = null;
+    }
+    if (drawType !== 'None') {
+      draw = new ol.interaction.Draw({
+        source: roadSource,
+        type: drawType
+      });
+      map.addInteraction(draw);
+    }
+  }
+
+  // Schalter zum Aktivieren/Deaktivieren des Zeichnens
+  drawToggleButton.addEventListener('click', function() {
+    var type = drawTypeSelect.value;
+    addDrawInteraction(type);
+  });
+</script>
+</body>
+</html>
