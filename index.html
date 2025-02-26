@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8">
-  <title>OpenLayers Münster Map</title>
+  <title>OpenLayers Münster Map - Erweiterte Zeichentools mit SVG-Symbolen</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@latest/ol.css">
   <link rel="icon" type="image/png" href="logoSmartRad.png">
   <style>
@@ -16,14 +16,11 @@
       height: 100%;
       width: 100%;
     }
-    /* Einfaches Styling für die Toolbar */
     #toolbar {
-      position: absolute;
-      top: 10px;
-      left: 10px;
+      position: relative;
       background: white;
-      padding: 5px;
-      border: 1px solid #ccc;
+      padding: 10px;
+      border-bottom: 1px solid #ccc;
       z-index: 1000;
     }
   </style>
@@ -32,74 +29,136 @@
 <div id="toolbar">
   <select id="draw-type">
     <option value="None">Kein Zeichnen</option>
-    <option value="Point">Punkt</option>
-    <option value="LineString">Linie</option>
-    <option value="Polygon">Polygon</option>
+    <option value="PointRed">Punkt Rot</option>
+    <option value="PointGreen">Punkt Grün</option>
+    <option value="PointBlue">Punkt Blau</option>
+    <option value="LineRed">Linie Rot</option>
+    <option value="LineGreen">Linie Grün</option>
+    <option value="LineBlue">Linie Blau</option>
+    <option value="PolygonRed">Polygon Rot</option>
+    <option value="PolygonGreen">Polygon Grün</option>
+    <option value="PolygonBlue">Polygon Blau</option>
+    <option value="SymbolAchtung">Symbol Achtung</option>
+    <option value="SymbolBicycle">Symbol Fahrrad</option>
   </select>
   <button id="draw-toggle">Zeichnen umschalten</button>
 </div>
 <div id="map" class="map"></div>
 <script src="https://cdn.jsdelivr.net/npm/ol@latest/dist/ol.js"></script>
 <script>
-  // Koordinaten für Münster (Längengrad, Breitengrad)
   var munsterCoords = ol.proj.fromLonLat([7.630, 51.960]);
 
-  // Erstelle die Map mit OSM als Basislayer
+  var basemapWMS = new ol.layer.Tile({
+    source: new ol.source.TileWMS({
+      url: 'https://sgx.geodatenzentrum.de/wms_basemapde',
+      params: {
+        'LAYERS': 'de_basemapde_web_raster_farbe',
+        'STYLES': 'default',
+        'FORMAT': 'image/png',
+        'TILED': true
+      },
+      projection: 'EPSG:3857',
+      attributions: 'Kartendaten &copy; <a href="https://www.basemap.de/">basemap.de</a>'
+    })
+  });
+
   var map = new ol.Map({
     target: 'map',
-    layers: [
-      new ol.layer.Tile({
-        source: new ol.source.OSM()
-      })
-    ],
+    layers: [basemapWMS],
     view: new ol.View({
       center: munsterCoords,
       zoom: 13
     })
   });
 
-  // Erstelle eine Vektorquelle und -layer für das Straßennetz
-  var roadSource = new ol.source.Vector();
-  var roadLayer = new ol.layer.Vector({
-    source: roadSource,
-    style: new ol.style.Style({
+  var drawSource = new ol.source.Vector();
+  var drawLayer = new ol.layer.Vector({
+    source: drawSource
+  });
+  map.addLayer(drawLayer);
+
+  // Definieren der verschiedenen Styles inkl. SVG-Symbole
+  var styles = {
+    'PointRed': new ol.style.Style({
+      image: new ol.style.Circle({
+        radius: 5,
+        fill: new ol.style.Fill({ color: '#ff0000' })
+      })
+    }),
+    'PointGreen': new ol.style.Style({
+      image: new ol.style.Circle({
+        radius: 5,
+        fill: new ol.style.Fill({ color: '#00ff00' })
+      })
+    }),
+    'PointBlue': new ol.style.Style({
+      image: new ol.style.Circle({
+        radius: 5,
+        fill: new ol.style.Fill({ color: '#0000ff' })
+      })
+    }),
+    'LineRed': new ol.style.Style({
       stroke: new ol.style.Stroke({
         color: '#ff0000',
         width: 2
       })
-    })
-  });
-  map.addLayer(roadLayer);
-
-  // Funktion, um das Straßennetz via Overpass API zu laden
-  function loadRoads() {
-    var query = '[out:xml];area[name="Münster"]->.searchArea;(way["highway"](area.searchArea););out body;>;out skel qt;';
-    var url = 'https://overpass-api.de/api/interpreter?data=' + encodeURIComponent(query);
-    fetch(url)
-      .then(function(response) { return response.text(); })
-      .then(function(data) {
-        var parser = new DOMParser();
-        var xmlDoc = parser.parseFromString(data, 'application/xml');
-        var format = new ol.format.OSMXML();
-        var features = format.readFeatures(xmlDoc, {
-          featureProjection: 'EPSG:3857'
-        });
-        roadSource.addFeatures(features);
+    }),
+    'LineGreen': new ol.style.Style({
+      stroke: new ol.style.Stroke({
+        color: '#00ff00',
+        width: 2
       })
-      .catch(function(error) {
-        console.error('Fehler beim Laden der Straßendaten:', error);
-      });
-  }
-  loadRoads();
+    }),
+    'LineBlue': new ol.style.Style({
+      stroke: new ol.style.Stroke({
+        color: '#0000ff',
+        width: 2
+      })
+    }),
+    'PolygonRed': new ol.style.Style({
+      stroke: new ol.style.Stroke({ color: '#ff0000', width: 2 }),
+      fill: new ol.style.Fill({ color: 'rgba(255, 0, 0, 0.3)' })
+    }),
+    'PolygonGreen': new ol.style.Style({
+      stroke: new ol.style.Stroke({ color: '#00ff00', width: 2 }),
+      fill: new ol.style.Fill({ color: 'rgba(0, 255, 0, 0.3)' })
+    }),
+    'PolygonBlue': new ol.style.Style({
+      stroke: new ol.style.Stroke({ color: '#0000ff', width: 2 }),
+      fill: new ol.style.Fill({ color: 'rgba(0, 0, 255, 0.3)' })
+    }),
+    'SymbolAchtung': new ol.style.Style({
+      image: new ol.style.Icon({
+        src: "data:image/svg+xml;utf8," +
+"<svg xmlns='http://www.w3.org/2000/svg' width='30' height='30' viewBox='0 0 100 100'>" +
+  // Dreieck mit abgerundeten Ecken
+  "<polygon points='50,5 95,95 5,95' fill='red' stroke='white' stroke-width='5' stroke-linejoin='round'/>" +
+  // Ausrufezeichen-Strich
+  "<line x1='50' y1='30' x2='50' y2='60' stroke='white' stroke-width='5' stroke-linecap='round'/>" +
+  // Punkt unten
+  "<circle cx='50' cy='75' r='4' fill='white' />" +
+"</svg>"
+,
+        scale: 0.7,
+        anchor: [0.5, 0.5]
+      })
+    }),
+    // Schwarzes Fahrrad-Symbol als SVG
+    'SymbolBicycle': new ol.style.Style({
+      image: new ol.style.Icon({
+        src: "data:image/svg+xml;utf8," +
+             "<svg xmlns='http://www.w3.org/2000/svg' xmlns:xlink='http://www.w3.org/1999/xlink' version='1.1' width='60' height='60' viewBox='0 0 256 256' xml:space='preserve'>" +
+               "<g style='stroke: none; stroke-width: 0; stroke-dasharray: none; stroke-linecap: butt; stroke-linejoin: miter; stroke-miterlimit: 10; fill: none; fill-rule: nonzero; opacity: 1;' transform='translate(1.4065934065934016 1.4065934065934016) scale(2.81 2.81)'>" +
+                 "<path d='M 71.194 32.312 c -2.886 0 -5.612 0.673 -8.058 1.84 l -3.668 -6.37 l 3.351 -5.445 c 0.282 -0.458 0.294 -1.032 0.032 -1.501 c -0.263 -0.469 -0.758 -0.76 -1.295 -0.76 h -8.423 c -0.819 0 -1.484 0.664 -1.484 1.484 s 0.664 1.484 1.484 1.484 h 5.768 l -1.988 3.231 H 32.346 l -0.55 -1.006 h 1.233 c 0.82 0 1.484 -0.664 1.484 -1.484 s -0.664 -1.484 -1.484 -1.484 H 21.825 c -0.82 0 -1.484 0.664 -1.484 1.484 s 0.664 1.484 1.484 1.484 h 6.589 l 1.311 2.398 l -3.357 6.247 c -2.317 -1.022 -4.872 -1.6 -7.562 -1.6 C 8.437 32.312 0 40.749 0 51.119 c 0 10.369 8.437 18.806 18.806 18.806 c 9.869 0 17.97 -7.646 18.731 -17.322 h 5.213 v 2.118 h -2.331 c -0.82 0 -1.484 0.664 -1.484 1.484 s 0.664 1.484 1.484 1.484 h 6.516 c 0.819 0 1.484 -0.664 1.484 -1.484 s -0.664 -1.484 -1.484 -1.484 h -1.218 v -3.204 L 57.74 30.725 l 2.82 4.898 c -4.93 3.394 -8.172 9.071 -8.172 15.495 c 0 10.369 8.437 18.806 18.807 18.806 C 81.563 69.924 90 61.488 90 51.119 C 90 40.749 81.563 32.312 71.194 32.312 z M 31.424 30.773 l 10.309 18.862 h -4.196 c -0.472 -6.001 -3.765 -11.212 -8.559 -14.31 L 31.424 30.773 z M 34.57 49.635 H 21.287 l 6.286 -11.697 C 31.444 40.521 34.114 44.76 34.57 49.635 z M 18.806 66.957 c -8.734 0 -15.839 -7.106 -15.839 -15.839 c 0 -8.734 7.106 -15.839 15.839 -15.839 c 2.183 0 4.264 0.444 6.158 1.246 l -7.465 13.891 c -0.247 0.46 -0.234 1.015 0.033 1.463 c 0.268 0.448 0.751 0.722 1.273 0.722 H 34.57 C 33.819 60.641 27.039 66.957 18.806 66.957 z M 44.27 48.092 L 33.967 29.241 h 21.204 L 44.27 48.092 z M 71.194 66.957 c -8.734 0 -15.84 -7.106 -15.84 -15.839 c 0 -5.326 2.651 -10.037 6.694 -12.909 l 7.86 13.649 c 0.274 0.477 0.774 0.744 1.286 0.744 c 0.251 0 0.506 -0.064 0.739 -0.198 c 0.711 -0.409 0.954 -1.315 0.546 -2.025 l -7.861 -13.652 c 2.006 -0.92 4.228 -1.447 6.576 -1.447 c 8.733 0 15.839 7.106 15.839 15.839 C 87.033 59.852 79.927 66.957 71.194 66.957 z' style='stroke: none; stroke-width: 1; fill: rgb(0,0,0); fill-rule: nonzero; opacity: 1;' transform=' matrix(1 0 0 1 0 0) ' stroke-linecap='round'/>" +
+               "</g>" +
+             "</svg>",
+        scale: 0.5,
+        anchor: [0.5, 0.5]
+      })
+    })
+  };
 
-  // Hinzufügen der Modify-Interaktion, um Geometrien bearbeiten zu können
-  var modify = new ol.interaction.Modify({
-    source: roadSource
-  });
-  map.addInteraction(modify);
-
-  // Hinzufügen einer Draw-Interaktion, um neue Geometrien hinzufügen zu können
-  var draw; // Globale Variable für die Draw-Interaktion
+  var draw;
   var drawTypeSelect = document.getElementById('draw-type');
   var drawToggleButton = document.getElementById('draw-toggle');
 
@@ -109,15 +168,32 @@
       draw = null;
     }
     if (drawType !== 'None') {
+      var geomType;
+      // Falls ein Symbol gewählt wurde, behandeln wir es als Punkt
+      if (drawType.startsWith('Symbol') || drawType.includes('Point')) {
+        geomType = 'Point';
+      } else if (drawType.includes('Line')) {
+        geomType = 'LineString';
+      } else if (drawType.includes('Polygon')) {
+        geomType = 'Polygon';
+      }
+      
       draw = new ol.interaction.Draw({
-        source: roadSource,
-        type: drawType
+        source: drawSource,
+        type: geomType,
+        style: styles[drawType]
       });
+      
+      // Nach Abschluss des Zeichnens den gewählten Style dauerhaft setzen
+      let currentStyle = styles[drawType];
+      draw.on('drawend', function(event) {
+        event.feature.setStyle(currentStyle);
+      });
+      
       map.addInteraction(draw);
     }
   }
 
-  // Schalter zum Aktivieren/Deaktivieren des Zeichnens
   drawToggleButton.addEventListener('click', function() {
     var type = drawTypeSelect.value;
     addDrawInteraction(type);
